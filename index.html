@@ -84,6 +84,12 @@ input:disabled{background:var(--accsoft);border-color:transparent;opacity:1;-web
 .seg{display:flex;gap:6px;margin:10px 0 4px}
 .seg button{flex:1;padding:10px 0;border-radius:10px;background:var(--accsoft);color:var(--acc);font-size:13px;font-weight:500}
 .seg button.on{background:var(--acc);color:#fff}
+.res{display:none;margin-top:6px;border:1px solid var(--line);border-radius:12px;background:var(--card);max-height:min(300px,42vh);overflow:auto}
+.res.on{display:block}
+.res button{display:block;width:100%;text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
+.res button:last-child{border-bottom:0}
+.res b{display:block;font-weight:500}.res span{font-size:13px;color:var(--mut)}
+.res p{margin:0;padding:14px;color:var(--mut);font-size:14px}
 </style>
 </head>
 <body>
@@ -197,7 +203,7 @@ function miniRecap(es){
   return `<div class="mini"><span></span><u>kcal</u><u>C</u><u>G</u><u>P</u>${rows}</div>`;
 }
 function entryRow(e){
-  return `<div class="item"><div class="t"><b>${esc(e.name)}</b><span class="sub">${r0(e.g)} g · C ${r0(e.c)} G ${r0(e.f)} P ${r0(e.p)}</span><span class="sub">Fibre ${r1(e.fi)} · Zuccheri ${r1(e.z)} · Saturi ${r1(e.sa)} · Sale ${r1(e.sl)}</span></div><b>${r0(e.k)}</b><button class="x" onclick="editEntry('${e.id}')" aria-label="Modifica"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delEntry('${e.id}')" aria-label="Elimina">×</button></div>`;
+  return `<div class="item"><div class="t"><b>${esc(e.name)}</b><span class="sub">${e.brand?esc(e.brand)+' · ':''}${r0(e.g)} g · C ${r0(e.c)} G ${r0(e.f)} P ${r0(e.p)}</span><span class="sub">Fibre ${r1(e.fi)} · Zuccheri ${r1(e.z)} · Saturi ${r1(e.sa)} · Sale ${r1(e.sl)}</span></div><b>${r0(e.k)}</b><button class="x" onclick="editEntry('${e.id}')" aria-label="Modifica"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delEntry('${e.id}')" aria-label="Elimina">×</button></div>`;
 }
 function mealList(es){
   if(!es.length)return '<div class="empty">Niente ancora. Tocca + per aggiungere un cibo.</div>';
@@ -215,11 +221,12 @@ function editEntry(id){
   showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">Modifica voce</h1><button class="x" onclick="closeSheet()">×</button></div>
   <div class="seg" id="seg">${MEALS.map((n,i)=>`<button class="${i===cm?'on':''}" onclick="setMeal(${i})">${n}</button>`).join('')}</div>
   <label>Nome</label><input id="e-name">
+  ${brandField('e-brand')}
   <label>Quantità mangiata (g)</label><input id="e-g" inputmode="decimal">
   <label style="margin-top:18px"><b>Valori nutrizionali per 100 g</b></label>
   <div class="g2">${fld('e-k','Energia (kcal)')}${fld('e-p','Proteine (g)')}${fld('e-c','Carboidrati (g)')}${fld('e-z','di cui zuccheri (g)')}${fld('e-f','Grassi (g)')}${fld('e-sa','di cui saturi (g)')}${fld('e-fi','Fibre (g)')}${fld('e-sl','Sale (g)')}</div>
   <button class="btn" onclick="saveEdit()">Salva modifiche</button>`);
-  $('e-name').value=e.name;$('e-g').value=r1(e.g);
+  $('e-name').value=e.name;$('e-brand').value=e.brand||'';$('e-g').value=r1(e.g);
   [['k','k'],['p','p'],['c','c'],['z','z'],['f','f'],['sa','sa'],['fi','fi'],['sl','sl']].forEach(([i,f])=>{$('e-'+i).value=r1((e[f]||0)*k)});
 }
 function saveEdit(){
@@ -229,7 +236,7 @@ function saveEdit(){
   if(!name){toast('Scrivi un nome per il cibo');return}
   if(!g){toast('Inserisci la quantità in grammi');return}
   const q=g/100;
-  Object.assign(e,{name,g,m:cm,k:v('e-k')*q,p:v('e-p')*q,c:v('e-c')*q,f:v('e-f')*q,z:v('e-z')*q,sa:v('e-sa')*q,fi:v('e-fi')*q,sl:v('e-sl')*q});
+  Object.assign(e,{name,brand:$('e-brand').value.trim(),g,m:cm,k:v('e-k')*q,p:v('e-p')*q,c:v('e-c')*q,f:v('e-f')*q,z:v('e-z')*q,sa:v('e-sa')*q,fi:v('e-fi')*q,sl:v('e-sl')*q});
   save();closeSheet();render();toast('Voce modificata');
 }
 function delEntry(id){S.log=S.log.filter(e=>e.id!==id);save();render();toast('Voce eliminata')}
@@ -240,34 +247,55 @@ function closeSheet(){$('sheet').classList.remove('on')}
 $('sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
 
 const fld=(id,l)=>`<div><label>${l}</label><input id="${id}" inputmode="decimal"></div>`;
+const brandField=id=>`<label>Marca</label><div class="row"><input id="${id}" placeholder="Es. Barilla" autocomplete="off"><button class="chip" onclick="$('${id}').value='Generica'">Generica</button></div>`;
+const sameName=(a,b)=>a.name.toLowerCase()===b.name.toLowerCase()&&(a.brand||'').toLowerCase()===(b.brand||'').toLowerCase();
+const nz=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function openAdd(){
   FL=allFoods();cm=defMeal();
   showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">Aggiungi cibo</h1><button class="x" onclick="closeSheet()">×</button></div>
   <div class="seg" id="seg">${MEALS.map((n,i)=>`<button class="${i===cm?'on':''}" onclick="setMeal(${i})">${n}</button>`).join('')}</div>
-  <button class="btn" onclick="startScan()">Scansiona codice a barre</button>
+  <div class="row sp" style="margin-top:6px"><label style="margin:0">Cerca tra i tuoi alimenti</label><button class="chip" onclick="closeSheet();setTab('ric')">Gestisci</button></div>
+  <input id="q" type="search" placeholder="Es. pasta, yogurt, Barilla…" autocomplete="off" style="margin-top:6px" oninput="searchFoods()" onfocus="searchFoods()">
+  <div class="res" id="res"></div>
+  <div class="row" style="margin-top:12px"><button class="btn" style="margin:0" onclick="startScan()">Scansiona codice a barre</button></div>
   <div class="row" style="margin-top:10px"><input id="f-code" inputmode="numeric" placeholder="Oppure scrivi il codice"><button class="btn alt" id="b-cerca" style="width:auto;margin:0;white-space:nowrap" onclick="lookup($('f-code').value)">Cerca</button></div>
   <div class="st" id="st"></div>
-  ${FL.length?`<div class="row sp"><label>I tuoi alimenti e ricette</label><button class="chip" onclick="closeSheet();setTab('ric')">Gestisci</button></div><div class="chips">${FL.map((f,i)=>`<button class="chip" onclick="pick(${i})">${esc(f.name)}</button>`).join('')}</div>`:''}
   <label>Nome</label><input id="f-name" placeholder="Es. Yogurt greco">
+  ${brandField('f-brand')}
   <label style="margin-top:18px"><b>Valori nutrizionali per 100 g</b></label>
   <div class="g2">${fld('f-k','Energia (kcal)')}${fld('f-p','Proteine (g)')}${fld('f-c','Carboidrati (g)')}${fld('f-z','di cui zuccheri (g)')}${fld('f-f','Grassi (g)')}${fld('f-sa','di cui saturi (g)')}${fld('f-fi','Fibre (g)')}${fld('f-sl','Sale (g)')}</div>
   <label>Quantità mangiata (g)</label><input id="f-g" inputmode="decimal" placeholder="100" value="100">
   <button class="btn" onclick="addEntry()">Aggiungi al diario</button>
   <button class="btn alt" onclick="saveFood(true)">Salva solo tra i miei alimenti</button>`);
 }
+function searchFoods(){
+  const q=nz($('q').value).split(/\s+/).filter(Boolean),box=$('res');
+  const idx=FL.map((f,i)=>i).filter(i=>{const h=nz(FL[i].name+' '+(FL[i].brand||''));return q.every(t=>h.includes(t))})
+    .sort((x,y)=>FL[x].name.localeCompare(FL[y].name,'it'));
+  box.innerHTML=idx.length?idx.map(i=>{const f=FL[i];return `<button onclick="pick(${i})"><b>${esc(f.name)}</b><span>${f.brand?esc(f.brand)+' · ':''}${r0(f.k)} kcal / 100 g</span></button>`}).join('')
+    :`<p>${FL.length?'Nessun risultato. Compila i campi qui sotto per aggiungerlo.':'Nessun alimento salvato: scansiona un codice o compila a mano.'}</p>`;
+  box.classList.add('on');
+}
+$('sheet').addEventListener('focusin',e=>{const r=$('res');if(r&&e.target.id!=='q')r.classList.remove('on')});
+function fillFood(f){
+  $('f-name').value=f.name||'';$('f-brand').value=f.brand||'';
+  $('f-k').value=r1(f.k);$('f-p').value=r1(f.p);$('f-c').value=r1(f.c);$('f-f').value=r1(f.f);
+  $('f-z').value=r1(f.z);$('f-sa').value=r1(f.sa);$('f-fi').value=r1(f.fi);$('f-sl').value=r1(f.sl);
+  $('f-code').value=f.code||'';
+}
 function pick(i){
-  const f=FL[i];
-  $('f-name').value=f.name;$('f-k').value=r1(f.k);$('f-p').value=r1(f.p);$('f-c').value=r1(f.c);$('f-f').value=r1(f.f);$('f-z').value=r1(f.z);$('f-sa').value=r1(f.sa);$('f-sl').value=r1(f.sl);$('f-fi').value=r1(f.fi);
-  $('f-g').value=f.g||100;$('f-code').value=f.code||'';
+  const f=FL[i];fillFood(f);
+  $('f-g').value=f.g||100;$('q').value='';$('res').classList.remove('on');
+  const g=$('f-g');g.focus();g.select();
 }
 function readForm(){
   const v=id=>parseFloat(String($(id).value).replace(',','.'))||0;
-  return {name:$('f-name').value.trim(),code:$('f-code').value.trim(),k:v('f-k'),p:v('f-p'),c:v('f-c'),f:v('f-f'),z:v('f-z'),sa:v('f-sa'),sl:v('f-sl'),fi:v('f-fi'),g:v('f-g')};
+  return {name:$('f-name').value.trim(),brand:$('f-brand').value.trim(),code:$('f-code').value.trim(),k:v('f-k'),p:v('f-p'),c:v('f-c'),f:v('f-f'),z:v('f-z'),sa:v('f-sa'),sl:v('f-sl'),fi:v('f-fi'),g:v('f-g')};
 }
 function rememberFood(x){
   if(x.name.startsWith('Ricetta: '))return;
-  const i=S.foods.findIndex(f=>(x.code&&f.code===x.code)||f.name.toLowerCase()===x.name.toLowerCase());
-  const o={name:x.name,code:x.code,k:x.k,p:x.p,c:x.c,f:x.f,z:x.z,sa:x.sa,sl:x.sl,fi:x.fi};
+  const i=S.foods.findIndex(f=>(x.code&&f.code===x.code)||sameName(f,x));
+  const o={name:x.name,code:x.code,k:x.k,p:x.p,c:x.c,f:x.f,z:x.z,sa:x.sa,sl:x.sl,fi:x.fi,brand:x.brand||''};
   if(i>=0)S.foods[i]=o;else S.foods.push(o);
 }
 function saveFood(close){
@@ -281,7 +309,7 @@ function addEntry(){
   if(!x.name){$('st').textContent='Scrivi un nome per il cibo.';toast('Scrivi un nome per il cibo');return}
   if(!x.g){$('st').textContent='Inserisci la quantità in grammi.';toast('Inserisci la quantità in grammi');return}
   const m=x.g/100;
-  S.log.push({id:uid(),date:day,m:cm,name:x.name,g:x.g,k:x.k*m,p:x.p*m,c:x.c*m,f:x.f*m,z:x.z*m,sa:x.sa*m,sl:x.sl*m,fi:x.fi*m});
+  S.log.push({id:uid(),date:day,m:cm,name:x.name,brand:x.brand,g:x.g,k:x.k*m,p:x.p*m,c:x.c*m,f:x.f*m,z:x.z*m,sa:x.sa*m,sl:x.sl*m,fi:x.fi*m});
   rememberFood(x);save();closeSheet();render();toast('Aggiunto a '+MEALS[cm].toLowerCase()+': '+x.name);
 }
 
@@ -291,6 +319,8 @@ async function lookup(code){
   const st=$('st');
   if(!code){st.textContent='Inserisci un codice.';return}
   $('f-code').value=code;
+  const sv=S.foods.find(f=>f.code===code);
+  if(sv){fillFood(sv);st.textContent='Alimento già salvato: scegli la quantità.';toast('Alimento già salvato');return}
   st.textContent='Cerco il prodotto…';
   const b=$('b-cerca');if(b){b.disabled=true;b.textContent='Cerco…'}
   try{
@@ -300,9 +330,9 @@ async function lookup(code){
     const p=d.product,n=p.nutriments||{};
     let kc=n['energy-kcal_100g'];
     if(kc==null&&n['energy_100g']!=null)kc=n['energy_100g']/4.184;
-    $('f-name').value=[p.product_name,p.brands&&p.brands.split(',')[0]].filter(Boolean).join(' – ');
+    $('f-name').value=p.product_name||'';$('f-brand').value=p.brands?p.brands.split(',')[0].trim():'';
     $('f-k').value=r1(kc);$('f-p').value=r1(n.proteins_100g);$('f-c').value=r1(n.carbohydrates_100g);$('f-f').value=r1(n.fat_100g);$('f-z').value=r1(n.sugars_100g);$('f-sa').value=r1(n['saturated-fat_100g']);$('f-sl').value=r1(n.salt_100g);$('f-fi').value=r1(n.fiber_100g);
-    st.textContent='Trovato. Controlla i valori e scegli la quantità.';toast('Prodotto trovato');
+    st.textContent=$('f-brand').value?'Trovato. Controlla i valori e scegli la quantità.':'Trovato, ma senza marca: scrivila o tocca Generica.';toast('Prodotto trovato');
   }catch(e){st.textContent='Nessuna connessione o ricerca non disponibile. Compila i campi a mano.';toast('Ricerca non riuscita')}
   finally{if(b){b.disabled=false;b.textContent='Cerca'}}
 }
@@ -345,7 +375,7 @@ function vRec(){
     <button class="chip" onclick="logRecipe('${r.id}')">Mangiata</button><button class="x" onclick="delRecipe('${r.id}')" aria-label="Elimina">×</button></div>`}).join(''):'<div class="empty">Nessuna ricetta. Crea la prima con gli alimenti che hai già salvato.</div>'}
   <button class="btn" onclick="newRecipe()">Nuova ricetta</button>
   <h2>Alimenti salvati</h2>
-  ${S.foods.length?S.foods.map((f,i)=>`<div class="item"><div class="t"><b>${esc(f.name)}</b><span class="sub">per 100 g: ${r0(f.k)} kcal · P ${r1(f.p)} C ${r1(f.c)} G ${r1(f.f)}</span></div><button class="x" onclick="editFood(${i})" aria-label="Modifica alimento"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delFood(${i})" aria-label="Elimina alimento">×</button></div>`).join(''):'<div class="empty">Gli alimenti che aggiungi dal Diario compaiono qui.</div>'}`;
+  ${S.foods.length?S.foods.map((f,i)=>`<div class="item"><div class="t"><b>${esc(f.name)}</b><span class="sub">${f.brand?esc(f.brand)+' · ':''}per 100 g: ${r0(f.k)} kcal · P ${r1(f.p)} C ${r1(f.c)} G ${r1(f.f)}</span></div><button class="x" onclick="editFood(${i})" aria-label="Modifica alimento"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delFood(${i})" aria-label="Elimina alimento">×</button></div>`).join(''):'<div class="empty">Gli alimenti che aggiungi dal Diario compaiono qui.</div>'}`;
 }
 function newRecipe(){
   if(!S.foods.length){showSheet(`<h1 style="font-size:20px;color:var(--ink);font-weight:700">Servono degli alimenti</h1><p class="mut">Le ricette si compongono con alimenti salvati. Dal Diario, tocca + e scansiona o inserisci i tuoi ingredienti, poi “Salva solo tra i miei alimenti”.</p><button class="btn" onclick="closeSheet()">Ho capito</button>`);return}
@@ -356,7 +386,7 @@ function drawRecipe(){
   <label>Nome</label><input id="r-n" value="${esc(RN)}" oninput="RN=this.value" placeholder="Es. Pasta al pomodoro">
   <label>Porzioni</label><input id="r-p" inputmode="numeric" value="${RP}" oninput="RP=parseInt(this.value)||1">
   <label>Ingredienti</label>
-  ${RI.map((x,i)=>`<div class="row" style="margin-bottom:8px"><select onchange="RI[${i}].fi=+this.value">${S.foods.map((f,j)=>`<option value="${j}" ${j===x.fi?'selected':''}>${esc(f.name)}</option>`).join('')}</select>
+  ${RI.map((x,i)=>`<div class="row" style="margin-bottom:8px"><select onchange="RI[${i}].fi=+this.value">${S.foods.map((f,j)=>`<option value="${j}" ${j===x.fi?'selected':''}>${esc(f.name+(f.brand?' – '+f.brand:''))}</option>`).join('')}</select>
     <input style="width:90px" inputmode="decimal" value="${x.g}" oninput="RI[${i}].g=parseFloat(this.value.replace(',','.'))||0" aria-label="Grammi"><span class="mut">g</span>
     <button class="x" onclick="RI.splice(${i},1);drawRecipe()" aria-label="Rimuovi">×</button></div>`).join('')}
   <button class="btn alt" onclick="RI.push({fi:0,g:100});drawRecipe()">Aggiungi ingrediente</button>
@@ -373,11 +403,12 @@ function editFood(i){
   FEI=i;
   showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">Modifica alimento</h1><button class="x" onclick="closeSheet()">×</button></div>
   <label>Nome</label><input id="a-name">
+  ${brandField('a-brand')}
   <label style="margin-top:18px"><b>Valori nutrizionali per 100 g</b></label>
   <div class="g2">${fld('a-k','Energia (kcal)')}${fld('a-p','Proteine (g)')}${fld('a-c','Carboidrati (g)')}${fld('a-z','di cui zuccheri (g)')}${fld('a-f','Grassi (g)')}${fld('a-sa','di cui saturi (g)')}${fld('a-fi','Fibre (g)')}${fld('a-sl','Sale (g)')}</div>
   <p class="mut" style="margin:12px 0 0">Le voci già nel diario e le ricette già create non cambiano.</p>
   <button class="btn" onclick="saveFoodEdit()">Salva modifiche</button>`);
-  $('a-name').value=f.name;
+  $('a-name').value=f.name;$('a-brand').value=f.brand||'';
   ['k','p','c','z','f','sa','fi','sl'].forEach(k=>{$('a-'+k).value=r1(f[k])});
 }
 function saveFoodEdit(){
@@ -385,7 +416,7 @@ function saveFoodEdit(){
   const v=id=>parseFloat(String($(id).value).replace(',','.'))||0;
   const name=$('a-name').value.trim();
   if(!name){toast('Scrivi un nome per il cibo');return}
-  Object.assign(f,{name,k:v('a-k'),p:v('a-p'),c:v('a-c'),z:v('a-z'),f:v('a-f'),sa:v('a-sa'),fi:v('a-fi'),sl:v('a-sl')});
+  Object.assign(f,{name,brand:$('a-brand').value.trim(),k:v('a-k'),p:v('a-p'),c:v('a-c'),z:v('a-z'),f:v('a-f'),sa:v('a-sa'),fi:v('a-fi'),sl:v('a-sl')});
   save();closeSheet();keepScroll(render);toast('Alimento aggiornato');
 }
 function delFood(i){const f=S.foods[i];if(f&&confirm('Eliminare "'+f.name+'" dagli alimenti salvati?')){S.foods.splice(i,1);save();render();toast('Alimento eliminato')}}
@@ -458,7 +489,7 @@ function dlFile(blob,name){
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
 function exportData(){
-  const name='cibo-backup-'+TODAY+'.json';
+  const name='foodtracking-backup-'+TODAY+'.json';
   const blob=new Blob([JSON.stringify({app:'cibo',v:1,exportedAt:new Date().toISOString(),data:S},null,1)],{type:'application/json'});
   const done=()=>{S.lastExport=TODAY;save();render();toast('Backup esportato')};
   try{
@@ -496,7 +527,7 @@ function importApply(mode){
   }else{
     const li=new Set(S.log.map(x=>x.id));d.log.forEach(x=>{if(!li.has(x.id))S.log.push(x)});
     const ri=new Set(S.recipes.map(x=>x.id));d.recipes.forEach(x=>{if(!ri.has(x.id))S.recipes.push(x)});
-    d.foods.forEach(f=>{if(f&&f.name&&S.foods.findIndex(x=>(f.code&&x.code===f.code)||x.name.toLowerCase()===f.name.toLowerCase())<0)S.foods.push(f)});
+    d.foods.forEach(f=>{if(f&&f.name&&S.foods.findIndex(x=>(f.code&&x.code===f.code)||sameName(x,f))<0)S.foods.push(f)});
     Object.keys(d.weights).forEach(k=>{if(S.weights[k]==null)S.weights[k]=d.weights[k]});
   }
   IMP=null;save();closeSheet();render();toast('Dati importati');
@@ -518,7 +549,7 @@ async function fbInit(){
 function mergeData(d){
   const li=new Set(S.log.map(x=>x.id));(d.log||[]).forEach(x=>{if(!li.has(x.id))S.log.push(x)});
   const ri=new Set(S.recipes.map(x=>x.id));(d.recipes||[]).forEach(x=>{if(!ri.has(x.id))S.recipes.push(x)});
-  (d.foods||[]).forEach(f=>{if(f&&f.name&&S.foods.findIndex(x=>(f.code&&x.code===f.code)||x.name.toLowerCase()===f.name.toLowerCase())<0)S.foods.push(f)});
+  (d.foods||[]).forEach(f=>{if(f&&f.name&&S.foods.findIndex(x=>(f.code&&x.code===f.code)||sameName(x,f))<0)S.foods.push(f)});
   const w=d.weights||{};Object.keys(w).forEach(k=>{if(S.weights[k]==null)S.weights[k]=w[k]});
 }
 function startSync(){
