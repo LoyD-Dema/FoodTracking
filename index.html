@@ -276,7 +276,7 @@ function searchFoods(){
     :`<p>${FL.length?'Nessun risultato. Compila i campi qui sotto per aggiungerlo.':'Nessun alimento salvato: scansiona un codice o compila a mano.'}</p>`;
   box.classList.add('on');
 }
-$('sheet').addEventListener('focusin',e=>{const r=$('res');if(r&&e.target.id!=='q')r.classList.remove('on')});
+$('sheet').addEventListener('focusin',e=>{const r=$('res');if(r&&e.target.id!=='q'&&!e.target.closest('#res'))r.classList.remove('on')});
 function fillFood(f){
   $('f-name').value=f.name||'';$('f-brand').value=f.brand||'';
   $('f-k').value=r1(f.k);$('f-p').value=r1(f.p);$('f-c').value=r1(f.c);$('f-f').value=r1(f.f);
