@@ -115,6 +115,7 @@ const FB_CONFIG={
   messagingSenderId:"821501736057",
   appId:"1:821501736057:web:b443a50fb2e235f87850a8"
 };
+const APP_V='2026-11-10b';
 const K='cibo.v1';
 let S={goal:2000,foods:[],recipes:[],log:[],weights:{}};
 try{const r=localStorage.getItem(K);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
@@ -135,12 +136,11 @@ const sum=a=>a.reduce((s,e)=>({k:s.k+e.k,p:s.p+e.p,c:s.c+e.c,f:s.f+e.f,z:s.z+(e.
 function recTot(r){
   let g=0,k=0,p=0,c=0,f=0,z=0,sa=0,sl=0,fi=0;
   r.ings.forEach(i=>{const m=i.g/100;g+=i.g;k+=i.k*m;p+=i.p*m;c+=i.c*m;f+=i.f*m;z+=(i.z||0)*m;sa+=(i.sa||0)*m;sl+=(i.sl||0)*m;fi+=(i.fi||0)*m});
-  const n=Math.max(1,r.portions||1);
-  return {g,k,p,c,f,z,sa,sl,fi,n,pk:k/n,pg:g/n};
+  return {g,k,p,c,f,z,sa,sl,fi};
 }
 function allFoods(){
   const rec=S.recipes.map(r=>{const t=recTot(r),s=t.g||1;
-    return {name:'Ricetta: '+r.name,k:t.k/s*100,p:t.p/s*100,c:t.c/s*100,f:t.f/s*100,z:t.z/s*100,sa:t.sa/s*100,sl:t.sl/s*100,fi:t.fi/s*100,g:r0(t.pg)}});
+    return {name:'Ricetta: '+r.name,k:t.k/s*100,p:t.p/s*100,c:t.c/s*100,f:t.f/s*100,z:t.z/s*100,sa:t.sa/s*100,sl:t.sl/s*100,fi:t.fi/s*100,g:r0(t.g),rid:r.id}});
   return S.foods.concat(rec);
 }
 function fmtDay(s){
@@ -264,7 +264,7 @@ function openAdd(){
   ${brandField('f-brand')}
   <label style="margin-top:18px"><b>Valori nutrizionali per 100 g</b></label>
   <div class="g2">${fld('f-k','Energia (kcal)')}${fld('f-p','Proteine (g)')}${fld('f-c','Carboidrati (g)')}${fld('f-z','di cui zuccheri (g)')}${fld('f-f','Grassi (g)')}${fld('f-sa','di cui saturi (g)')}${fld('f-fi','Fibre (g)')}${fld('f-sl','Sale (g)')}</div>
-  <label>Quantità mangiata (g)</label><input id="f-g" inputmode="decimal" placeholder="100" value="100">
+  <label>Quantità mangiata (g)</label><input id="f-g" inputmode="decimal" placeholder="100" value="100" onkeydown="if(event.key==='Enter')addEntry()">
   <button class="btn" onclick="addEntry()">Aggiungi al diario</button>
   <button class="btn alt" onclick="saveFood(true)">Salva solo tra i miei alimenti</button>`);
 }
@@ -276,7 +276,7 @@ function searchFoods(){
     :`<p>${FL.length?'Nessun risultato. Compila i campi qui sotto per aggiungerlo.':'Nessun alimento salvato: scansiona un codice o compila a mano.'}</p>`;
   box.classList.add('on');
 }
-$('sheet').addEventListener('focusin',e=>{const r=$('res');if(r&&e.target.id!=='q'&&!e.target.closest('#res'))r.classList.remove('on')});
+$('sheet').addEventListener('focusin',e=>{document.querySelectorAll('#sheet .res').forEach(r=>{if(!r.contains(e.target)&&e.target!==r.previousElementSibling)r.classList.remove('on')})});
 function fillFood(f){
   $('f-name').value=f.name||'';$('f-brand').value=f.brand||'';
   $('f-k').value=r1(f.k);$('f-p').value=r1(f.p);$('f-c').value=r1(f.c);$('f-f').value=r1(f.f);
@@ -284,9 +284,32 @@ function fillFood(f){
   $('f-code').value=f.code||'';
 }
 function pick(i){
-  const f=FL[i];fillFood(f);
-  $('f-g').value=f.g||100;$('q').value='';$('res').classList.remove('on');
-  const g=$('f-g');g.focus();g.select();
+  const f=FL[i];if(f.rid){logRecipe(f.rid,cm);return}
+  const g0=f.g||100,m=cm;
+  showSheet(`<div class="row sp"><button class="x" style="width:auto;font-size:15px;padding:0 6px;color:var(--acc)" onclick="openAdd();setMeal(${m})">‹ Indietro</button><button class="x" onclick="closeSheet()">×</button></div>
+  <h1 style="font-size:22px;color:var(--ink);font-weight:700;margin:6px 0 2px">${esc(f.name)}</h1>
+  <div class="mut">${f.brand?esc(f.brand)+' · ':''}${r0(f.k)} kcal / 100 g</div>
+  <div class="seg" id="seg">${MEALS.map((n,j)=>`<button class="${j===m?'on':''}" onclick="setMeal(${j})">${n}</button>`).join('')}</div>
+  <label>Quantità (g)</label><input id="qa-g" inputmode="decimal" value="${g0}" oninput="qaPrev(${i})" onkeydown="if(event.key==='Enter')quickAdd(${i})">
+  <div id="qa-prev" style="margin:14px 0 4px;font-size:15px"></div>
+  <button class="btn" onclick="quickAdd(${i})">Aggiungi al diario</button>
+  <button class="btn alt" onclick="pickEdit(${i})">Modifica i valori</button>`);
+  qaPrev(i);const g=$('qa-g');g.focus();g.select();
+}
+function qaPrev(i){
+  const f=FL[i],q=(parseFloat(String($('qa-g').value).replace(',','.'))||0)/100;
+  $('qa-prev').innerHTML=`<b>${r0(f.k*q)} kcal</b> · C ${r1(f.c*q)} · G ${r1(f.f*q)} · P ${r1(f.p*q)}`;
+}
+function quickAdd(i){
+  const f=FL[i],g=parseFloat(String($('qa-g').value).replace(',','.'))||0;
+  if(!g){toast('Inserisci la quantità in grammi');return}
+  const m=g/100;
+  S.log.push({id:uid(),date:day,m:cm,name:f.name,brand:f.brand||'',g,k:f.k*m,p:f.p*m,c:f.c*m,f:f.f*m,z:(f.z||0)*m,sa:(f.sa||0)*m,sl:(f.sl||0)*m,fi:(f.fi||0)*m});
+  save();closeSheet();render();toast('Aggiunto a '+MEALS[cm].toLowerCase()+': '+f.name);
+}
+function pickEdit(i){
+  const f=FL[i],m=cm,g=parseFloat(String($('qa-g').value).replace(',','.'))||f.g||100;
+  openAdd();setMeal(m);fillFood(f);$('f-g').value=g;
 }
 function readForm(){
   const v=id=>parseFloat(String($(id).value).replace(',','.'))||0;
@@ -368,34 +391,62 @@ function stopScan(){
 function found(code){stopScan();if(navigator.vibrate)navigator.vibrate(60);lookup(code)}
 
 /* ---------- Ricette ---------- */
-let RN='',RP=1,RI=[];
+let RID=null,RN='',RI=[];
 function vRec(){
   return `<h2 style="margin-top:8px">Ricette</h2>
-  ${S.recipes.length?S.recipes.map(r=>{const t=recTot(r);return `<div class="item"><div class="t"><b>${esc(r.name)}</b><span class="mut">${r0(t.pk)} kcal a porzione · ${t.n} porz.</span></div>
-    <button class="chip" onclick="logRecipe('${r.id}')">Mangiata</button><button class="x" onclick="delRecipe('${r.id}')" aria-label="Elimina">×</button></div>`}).join(''):'<div class="empty">Nessuna ricetta. Crea la prima con gli alimenti che hai già salvato.</div>'}
+  ${S.recipes.length?S.recipes.map(r=>{const t=recTot(r);return `<div class="item"><div class="t"><b>${esc(r.name)}</b><span class="sub">${r0(t.k)} kcal · ${r0(t.g)} g · ${r0(t.g?t.k/t.g*100:0)} kcal / 100 g</span></div>
+    <button class="chip" onclick="logRecipe('${r.id}')">Aggiungi</button><button class="x" onclick="editRecipe('${r.id}')" aria-label="Modifica ricetta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delRecipe('${r.id}')" aria-label="Elimina">×</button></div>`}).join(''):'<div class="empty">Nessuna ricetta. Crea la prima con gli alimenti che hai già salvato.</div>'}
   <button class="btn" onclick="newRecipe()">Nuova ricetta</button>
   <h2>Alimenti salvati</h2>
   ${S.foods.length?S.foods.map((f,i)=>`<div class="item"><div class="t"><b>${esc(f.name)}</b><span class="sub">${f.brand?esc(f.brand)+' · ':''}per 100 g: ${r0(f.k)} kcal · P ${r1(f.p)} C ${r1(f.c)} G ${r1(f.f)}</span></div><button class="x" onclick="editFood(${i})" aria-label="Modifica alimento"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button><button class="x" onclick="delFood(${i})" aria-label="Elimina alimento">×</button></div>`).join(''):'<div class="empty">Gli alimenti che aggiungi dal Diario compaiono qui.</div>'}`;
 }
-function newRecipe(){
-  if(!S.foods.length){showSheet(`<h1 style="font-size:20px;color:var(--ink);font-weight:700">Servono degli alimenti</h1><p class="mut">Le ricette si compongono con alimenti salvati. Dal Diario, tocca + e scansiona o inserisci i tuoi ingredienti, poi “Salva solo tra i miei alimenti”.</p><button class="btn" onclick="closeSheet()">Ho capito</button>`);return}
-  RN='';RP=1;RI=[{fi:0,g:100}];drawRecipe();
+function newRecipe(){RID=null;RN='';RI=[];drawRecipe()}
+function editRecipe(id){
+  const r=S.recipes.find(x=>x.id===id);if(!r)return;
+  RID=id;RN=r.name;RI=r.ings.map(x=>({...x}));drawRecipe();
 }
 function drawRecipe(){
-  showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">Nuova ricetta</h1><button class="x" onclick="closeSheet()">×</button></div>
-  <label>Nome</label><input id="r-n" value="${esc(RN)}" oninput="RN=this.value" placeholder="Es. Pasta al pomodoro">
-  <label>Porzioni</label><input id="r-p" inputmode="numeric" value="${RP}" oninput="RP=parseInt(this.value)||1">
+  showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">${RID?'Modifica ricetta':'Nuova ricetta'}</h1><button class="x" onclick="closeSheet()">×</button></div>
+  <label>Nome</label><input id="r-n" value="${esc(RN)}" oninput="RN=this.value" placeholder="Es. Pasta al pomodoro" autocomplete="off">
   <label>Ingredienti</label>
-  ${RI.map((x,i)=>`<div class="row" style="margin-bottom:8px"><select onchange="RI[${i}].fi=+this.value">${S.foods.map((f,j)=>`<option value="${j}" ${j===x.fi?'selected':''}>${esc(f.name+(f.brand?' – '+f.brand:''))}</option>`).join('')}</select>
-    <input style="width:90px" inputmode="decimal" value="${x.g}" oninput="RI[${i}].g=parseFloat(this.value.replace(',','.'))||0" aria-label="Grammi"><span class="mut">g</span>
-    <button class="x" onclick="RI.splice(${i},1);drawRecipe()" aria-label="Rimuovi">×</button></div>`).join('')}
-  <button class="btn alt" onclick="RI.push({fi:0,g:100});drawRecipe()">Aggiungi ingrediente</button>
+  <div id="ings"></div>
+  <div class="mut" id="rtot" style="margin:4px 0 8px"></div>
+  <label>Aggiungi ingrediente</label>
+  <input id="rq" type="search" placeholder="Cerca tra i tuoi alimenti" autocomplete="off" oninput="searchIng()" onfocus="searchIng()">
+  <div class="res" id="rres"></div>
   <button class="btn" onclick="saveRecipe()">Salva ricetta</button>`);
+  renderIngs();
+}
+function renderIngs(){
+  $('ings').innerHTML=RI.length?RI.map((x,i)=>`<div class="row" style="margin-bottom:8px"><div style="flex:1;min-width:0"><b style="font-weight:500">${esc(x.name)}</b><span class="sub">${x.brand?esc(x.brand)+' · ':''}${r0(x.k)} kcal / 100 g</span></div>
+    <input style="width:84px" inputmode="decimal" value="${x.g}" oninput="setIngG(${i},this.value)" aria-label="Grammi"><span class="mut">g</span>
+    <button class="x" onclick="rmIng(${i})" aria-label="Rimuovi">×</button></div>`).join(''):'<div class="mut" style="padding:4px 0">Nessun ingrediente: cercane uno qui sotto.</div>';
+  recTotal();
+}
+function recTotal(){const t=recTot({ings:RI});$('rtot').textContent=RI.length?`Totale: ${r0(t.g)} g · ${r0(t.k)} kcal`:''}
+function setIngG(i,v){RI[i].g=parseFloat(String(v).replace(',','.'))||0;recTotal()}
+function rmIng(i){RI.splice(i,1);renderIngs()}
+function searchIng(){
+  const q=nz($('rq').value).split(/\s+/).filter(Boolean),box=$('rres');
+  const idx=S.foods.map((f,i)=>i).filter(i=>{const h=nz(S.foods[i].name+' '+(S.foods[i].brand||''));return q.every(t=>h.includes(t))})
+    .sort((x,y)=>S.foods[x].name.localeCompare(S.foods[y].name,'it'));
+  box.innerHTML=idx.length?idx.map(i=>{const f=S.foods[i];return `<button onclick="addIng(${i})"><b>${esc(f.name)}</b><span>${f.brand?esc(f.brand)+' · ':''}${r0(f.k)} kcal / 100 g</span></button>`}).join('')
+    :`<p>${S.foods.length?'Nessun risultato.':'Nessun alimento salvato: aggiungili dal Diario con “Salva solo tra i miei alimenti”.'}</p>`;
+  box.classList.add('on');
+}
+function addIng(i){
+  const f=S.foods[i];if(!f)return;
+  RI.push({name:f.name,brand:f.brand||'',g:100,k:f.k,p:f.p,c:f.c,f:f.f,z:f.z||0,sa:f.sa||0,sl:f.sl||0,fi:f.fi||0});
+  $('rq').value='';$('rres').classList.remove('on');renderIngs();
+  const ins=document.querySelectorAll('#ings input'),l=ins[ins.length-1];if(l){l.focus();l.select()}
 }
 function saveRecipe(){
-  const ings=RI.filter(x=>x.g>0).map(x=>{const f=S.foods[x.fi];return {name:f.name,g:x.g,k:f.k,p:f.p,c:f.c,f:f.f,z:f.z||0,sa:f.sa||0,sl:f.sl||0,fi:f.fi||0}});
-  if(!RN.trim()||!ings.length){toast('Serve un nome e almeno un ingrediente');return}
-  S.recipes.push({id:uid(),name:RN.trim(),portions:Math.max(1,RP),ings});save();closeSheet();render();toast('Ricetta salvata');
+  const name=RN.trim(),ings=RI.filter(x=>x.g>0);
+  if(!name||!ings.length){toast('Serve un nome e almeno un ingrediente');return}
+  const upd=!!RID;
+  if(upd){const r=S.recipes.find(x=>x.id===RID);if(r){r.name=name;r.ings=ings;r.portions=1}}
+  else S.recipes.push({id:uid(),name,portions:1,ings});
+  save();closeSheet();keepScroll(render);toast(upd?'Ricetta aggiornata':'Ricetta salvata');
 }
 let FEI=null;
 function editFood(i){
@@ -421,15 +472,35 @@ function saveFoodEdit(){
 }
 function delFood(i){const f=S.foods[i];if(f&&confirm('Eliminare "'+f.name+'" dagli alimenti salvati?')){S.foods.splice(i,1);save();render();toast('Alimento eliminato')}}
 function delRecipe(id){S.recipes=S.recipes.filter(r=>r.id!==id);save();render();toast('Ricetta eliminata')}
-function logRecipe(id){
-  const d=defMeal();
-  showSheet(`<div class="row sp"><h1 style="font-size:20px;color:var(--ink);font-weight:700">Per quale pasto?</h1><button class="x" onclick="closeSheet()">×</button></div>${MEALS.map((n,i)=>`<button class="btn ${i===d?'':'alt'}" onclick="logRecipeAt('${id}',${i})">${n}</button>`).join('')}`);
+let RLID=null;
+function logRecipe(id,m){
+  const r=S.recipes.find(x=>x.id===id);if(!r)return;
+  RLID=id;const back=m!=null;cm=back?m:defMeal();
+  const t=recTot(r);
+  showSheet(`<div class="row sp">${back?`<button class="x" style="width:auto;font-size:15px;padding:0 6px;color:var(--acc)" onclick="openAdd();setMeal(${cm})">‹ Indietro</button>`:'<span></span>'}<button class="x" onclick="closeSheet()">×</button></div>
+  <h1 style="font-size:22px;color:var(--ink);font-weight:700;margin:6px 0 2px">${esc(r.name)}</h1>
+  <div class="mut">Ricetta intera: ${r0(t.g)} g · ${r0(t.k)} kcal</div>
+  <div class="seg" id="seg">${MEALS.map((n,i)=>`<button class="${i===cm?'on':''}" onclick="setMeal(${i})">${n}</button>`).join('')}</div>
+  <label>Quanto ne hai mangiato?</label>
+  <div class="chips">${[['Tutta',1],['½',.5],['⅓',1/3],['¼',.25]].map(([n,f])=>`<button class="chip" onclick="recFrac(${f})">${n}</button>`).join('')}</div>
+  <div class="row"><input id="r-g" inputmode="decimal" value="${r0(t.g)}" oninput="recPrev()" onkeydown="if(event.key==='Enter')logRecipeAt()" aria-label="Grammi"><span class="mut">g</span></div>
+  <div id="r-prev" style="margin:12px 0 4px;font-size:15px"></div>
+  <button class="btn" onclick="logRecipeAt()">Aggiungi al diario</button>`);
+  recPrev();
 }
-function logRecipeAt(id,m){
-  closeSheet();
-  const r=S.recipes.find(x=>x.id===id),t=recTot(r);
-  S.log.push({id:uid(),date:day,m,name:r.name,g:t.pg,k:t.pk,p:t.p/t.n,c:t.c/t.n,f:t.f/t.n,z:t.z/t.n,sa:t.sa/t.n,sl:t.sl/t.n,fi:t.fi/t.n});
-  save();tab='oggi';render();toast('Porzione aggiunta: '+MEALS[m].toLowerCase());
+function recFrac(f){const r=S.recipes.find(x=>x.id===RLID);if(!r)return;$('r-g').value=r0(recTot(r).g*f);recPrev()}
+function recPrev(){
+  const r=S.recipes.find(x=>x.id===RLID);if(!r)return;
+  const t=recTot(r),q=t.g?(parseFloat(String($('r-g').value).replace(',','.'))||0)/t.g:0;
+  $('r-prev').innerHTML=`<b>${r0(t.k*q)} kcal</b> · C ${r1(t.c*q)} · G ${r1(t.f*q)} · P ${r1(t.p*q)}`;
+}
+function logRecipeAt(){
+  const r=S.recipes.find(x=>x.id===RLID);if(!r)return;
+  const t=recTot(r),g=parseFloat(String($('r-g').value).replace(',','.'))||0;
+  if(!g||!t.g){toast('Inserisci quanto ne hai mangiato');return}
+  const q=g/t.g;
+  S.log.push({id:uid(),date:day,m:cm,name:r.name,brand:'Ricetta',g,k:t.k*q,p:t.p*q,c:t.c*q,f:t.f*q,z:t.z*q,sa:t.sa*q,sl:t.sl*q,fi:t.fi*q});
+  save();closeSheet();tab='oggi';render();toast('Aggiunto a '+MEALS[cm].toLowerCase()+': '+r.name);
 }
 
 /* ---------- Settimana ---------- */
@@ -481,7 +552,8 @@ function vWeek(){
   <p class="mut" style="margin:0 0 6px">${S.lastExport?'Ultimo backup: '+new Date(S.lastExport+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}):'Non hai ancora fatto un backup.'}<br>Il file contiene diario, alimenti, ricette e pesi. Conservalo su Drive o mandalo a te stesso.</p>
   <button class="btn" onclick="exportData()">Esporta i dati</button>
   <button class="btn alt" onclick="$('imp').click()">Importa da file</button>
-  ${syncUI()}`;
+  ${syncUI()}
+  <p class="mut" style="text-align:center;margin-top:28px">FoodTracking · versione ${APP_V}</p>`;
 }
 /* ---------- Backup ---------- */
 function dlFile(blob,name){
